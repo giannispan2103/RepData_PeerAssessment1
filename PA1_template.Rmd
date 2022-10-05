@@ -1,25 +1,98 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "assignment"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
+# Code for reading in the dataset and/or processing the data
 
 
-## What is the average daily activity pattern?
+```{r}
+data <- read.csv("activity.csv")
+head(data)
+```
+# Histogram of the total number of steps taken each day
+
+```{r}
+library(dplyr)
+steps_grouped <- data %>% group_by(date) %>% summarise_at(vars(c("steps")), list(steps = sum))
+head(steps_grouped)
+```
 
 
+```{r echo=FALSE}
+hist(steps_grouped$steps, main="daily steps", breaks=10)
+```
 
-## Imputing missing values
+# Mean and median number of steps taken each day
+
+```{r}
+print("mean")
+print(mean(steps_grouped$steps, na.rm = TRUE))
+print("median")
+print(median(steps_grouped$steps, na.rm = TRUE))
+```
+
+# Time series plot of the average number of steps taken
+
+```{r}
+library(ggplot2)
+steps_avg <- data %>% group_by(date) %>% summarise_at(vars(c("steps")), list(steps = mean))
+steps_avg <- steps_avg[!is.na(steps_avg$steps), ]
+plt <- ggplot(steps_avg, aes(date, steps, group = 1)) +
+         geom_point() +
+         geom_line() + 
+         labs(x = "Date", y = "Steps per 5 minute") + scale_x_discrete(guide = guide_axis(angle = 90))
+plt
+```
 
 
+# The 5-minute interval that, on average, contains the maximum number of steps
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+data_nona <- data[!is.na(data$steps), ]
+steps_avg_int <- data_nona %>% group_by(interval) %>% summarise_at(vars(c("steps")), list(steps = mean))
+#steps_avg_int <- steps_avg_int[!is.na(steps_avg_int$steps), ]
+steps_avg_int <- steps_avg_int[order(steps_avg_int$steps, decreasing = TRUE), ]
+steps_avg_int
+```
+the answer is the interval 835 which corresponds to 13.55 - 14.00 
+
+# Code to describe and show a strategy for imputing missing data
+```{r}
+sum(is.na(data$steps))
+```
+There are 2304 rows with NA steps. We will replace them with the mean number of steps on this interval
+```{r}
+data_merged <- merge(x=data, y=steps_avg_int, by.x='interval', by.y = 'interval') 
+head(data_merged)
+```
+
+
+```{r}
+data_merged[is.na(data_merged$steps.x), "steps.x"] <- data_merged[is.na(data_merged$steps.x), "steps.y"]
+head(data_merged)
+```
+# Histogram of the total number of steps taken each day after missing values are imputed
+
+```{r}
+steps_grouped_imputed <- data_merged %>% group_by(date) %>% summarise_at(vars(c("steps.x")), list(steps = sum))
+hist(steps_grouped_imputed$steps, main="daily steps", breaks=10)
+```
+
+# Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+
+```{r}
+library(lubridate)
+steps_avg$weekday <- wday(as.Date(steps_avg$date))
+steps_avg$weekend <- steps_avg$weekday==1 | steps_avg$weekday==7
+box_plot <- ggplot(steps_avg, aes(x = weekend, y = steps))
+box_plot +
+    geom_boxplot()
+```
+
+
